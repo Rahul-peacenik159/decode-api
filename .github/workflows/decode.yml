@@ -1,0 +1,167 @@
+name: Decode Pipeline
+
+# Triggered by Make.com via GitHub API:
+# POST /repos/Rahul-peacenik159/decode-api/dispatches
+# Body: { "event_type": "decode", "client_payload": { "url": "...", "slug": "...", "slack_channel": "...", "slack_thread_ts": "..." } }
+on:
+  repository_dispatch:
+    types: [decode]
+
+jobs:
+  decode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── 1. Checkout this repo (contains pipeline.py + api_server.py) ─────────
+      - name: Checkout decode-api
+        uses: actions/checkout@v4
+
+      # ── 2. Clone the three pipeline repos ────────────────────────────────────
+      - name: Clone website-decoder
+        run: git clone --depth 1 https://github.com/Rahul-peacenik159/website-decoder.git website-decoder
+
+      - name: Clone pptx-builder
+        run: git clone --depth 1 https://github.com/Rahul-peacenik159/pptx-builder.git pptx-builder
+
+      - name: Clone social-decoder
+        run: git clone --depth 1 https://github.com/Rahul-peacenik159/social-decoder.git social-decoder
+
+      # ── 3. Set up Python ──────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ── 4. Install dependencies ───────────────────────────────────────────────
+      - name: Install Python dependencies
+        run: |
+          pip install --quiet \
+            -r website-decoder/requirements.txt \
+            -r pptx-builder/requirements.txt \
+            -r social-decoder/requirements.txt
+
+      # ── 5. Install Playwright + Chromium ──────────────────────────────────────
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+
+      # ── 6. Post "working on it" to Slack ─────────────────────────────────────
+      - name: Slack — working on it
+        run: |
+          curl -s -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "channel": "${{ github.event.client_payload.slack_channel }}",
+              "thread_ts": "${{ github.event.client_payload.slack_thread_ts }}",
+              "text": "Got it! Decoding *${{ github.event.client_payload.url }}* — takes 3–5 mins, posting the deck here when ready 🚀"
+            }'
+
+      # ── 7. Run the pipeline ───────────────────────────────────────────────────
+      - name: Run pipeline
+        env:
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          SCRAPINGDOG_API_KEY: ${{ secrets.SCRAPINGDOG_API_KEY }}
+        run: |
+          mkdir -p /tmp/output
+          python pipeline.py \
+            --url    "${{ github.event.client_payload.url }}" \
+            --slug   "${{ github.event.client_payload.slug }}" \
+            --output /tmp/output \
+            --repo1  ./website-decoder \
+            --repo2  ./pptx-builder \
+            --repo3  ./social-decoder
+
+      # ── 8. Find the output PPTX ───────────────────────────────────────────────
+      - name: Find output PPTX
+        id: find_pptx
+        run: |
+          PPTX=$(ls /tmp/output/*.pptx | tail -1)
+          echo "pptx_path=$PPTX" >> $GITHUB_OUTPUT
+          echo "pptx_name=$(basename $PPTX)" >> $GITHUB_OUTPUT
+          echo "Found: $PPTX"
+
+      # ── 9a. Upload PPTX to Google Drive ──────────────────────────────────────
+      - name: Upload to Google Drive
+        id: gdrive
+        run: |
+          pip install --quiet google-api-python-client google-auth
+          python - <<'PYEOF'
+          import os, json, base64
+          from pathlib import Path
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          # Decode service account JSON from secret
+          sa_json = base64.b64decode(os.environ["GDRIVE_SA_JSON_B64"]).decode()
+          sa_info = json.loads(sa_json)
+
+          creds = service_account.Credentials.from_service_account_info(
+              sa_info,
+              scopes=["https://www.googleapis.com/auth/drive.file"]
+          )
+          service = build("drive", "v3", credentials=creds)
+
+          pptx_path = os.environ["PPTX_PATH"]
+          pptx_name = os.environ["PPTX_NAME"]
+          folder_id = os.environ.get("GDRIVE_FOLDER_ID", "")  # optional
+
+          file_meta = {"name": pptx_name}
+          if folder_id:
+              file_meta["parents"] = [folder_id]
+
+          media = MediaFileUpload(
+              pptx_path,
+              mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          )
+          uploaded = service.files().create(
+              body=file_meta, media_body=media, fields="id"
+          ).execute()
+
+          file_id = uploaded["id"]
+
+          # Make it viewable by anyone with the link
+          service.permissions().create(
+              fileId=file_id,
+              body={"type": "anyone", "role": "reader"}
+          ).execute()
+
+          view_url = f"https://drive.google.com/file/d/{file_id}/view"
+          print(f"GDRIVE_URL={view_url}")
+
+          # Write to GitHub output
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"gdrive_url={view_url}\n")
+          PYEOF
+        env:
+          GDRIVE_SA_JSON_B64: ${{ secrets.GDRIVE_SA_JSON_B64 }}
+          GDRIVE_FOLDER_ID:   ${{ secrets.GDRIVE_FOLDER_ID }}
+          PPTX_PATH:          ${{ steps.find_pptx.outputs.pptx_path }}
+          PPTX_NAME:          ${{ steps.find_pptx.outputs.pptx_name }}
+
+      # ── 9b. Also upload PPTX file directly to Slack ───────────────────────────
+      - name: Upload PPTX to Slack
+        run: |
+          curl -s -X POST https://slack.com/api/files.upload \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -F "channels=${{ github.event.client_payload.slack_channel }}" \
+            -F "thread_ts=${{ github.event.client_payload.slack_thread_ts }}" \
+            -F "file=@${{ steps.find_pptx.outputs.pptx_path }}" \
+            -F "filename=${{ steps.find_pptx.outputs.pptx_name }}" \
+            -F "initial_comment=✅ Decode complete! Google Drive: ${{ steps.gdrive.outputs.gdrive_url }}"
+
+      # ── 10. On failure — notify Slack ─────────────────────────────────────────
+      - name: Slack — notify failure
+        if: failure()
+        run: |
+          curl -s -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "channel": "${{ github.event.client_payload.slack_channel }}",
+              "thread_ts": "${{ github.event.client_payload.slack_thread_ts }}",
+              "text": "❌ Decode failed for ${{ github.event.client_payload.url }} — check the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
