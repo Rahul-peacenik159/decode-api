@@ -1,0 +1,116 @@
+{
+  "name": "Decode — Receiver",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "Receive from GitHub Actions"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionGetFile",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "{{1.pptx_url}}",
+        "serializeUrl": false,
+        "method": "get",
+        "headers": [],
+        "qs": [],
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Download PPTX"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "google-drive:ActionUploadFile",
+      "version": 3,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "driveId": "MyDrive",
+        "folderId": "",
+        "fileName": "{{1.pptx_filename}}",
+        "data": "{{2.data}}",
+        "convert": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Upload to Google Drive"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "slack:ActionCreateMessage",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "channelId": "{{1.slack_channel}}",
+        "thread_ts": "{{1.slack_thread_ts}}",
+        "text": "✅ Decode complete!\n\n📁 Google Drive: {{3.webViewLink}}",
+        "as_user": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0,
+          "name": "Slack — Post Drive Link"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    }
+  }
+}

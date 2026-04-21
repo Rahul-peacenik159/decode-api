@@ -1,0 +1,156 @@
+{
+  "name": "Decode — Trigger",
+  "flow": [
+    {
+      "id": 1,
+      "module": "slack:TriggerNewPublicMessage",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "filter": {
+        "name": "decode request",
+        "conditions": [
+          [
+            {
+              "a": "{{1.text}}",
+              "b": "decode",
+              "o": "text:contain"
+            }
+          ]
+        ]
+      },
+      "mapper": {
+        "channels": []
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "Watch Public Channel Messages"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "regexp:ParseText",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "pattern": "https?://[^\\s]+",
+        "text": "{{1.text}}",
+        "global": true
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Extract URL"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "regexp:ParseText",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "pattern": "slug\\s+(\\S+)",
+        "text": "{{1.text}}",
+        "global": true
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Extract Slug"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": false,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://api.github.com/repos/Rahul-peacenik159/decode-api/dispatches",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer PASTE_YOUR_GITHUB_PAT_HERE"
+          },
+          {
+            "name": "Accept",
+            "value": "application/vnd.github.v3+json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "contentType": "application/json",
+        "data": "{\"event_type\": \"decode\", \"client_payload\": {\"url\": \"{{2.`$[0]`}}\", \"slug\": \"{{3.`$[1]`}}\", \"make_webhook_url\": \"PASTE_SCENARIO_B_WEBHOOK_URL_HERE\", \"slack_channel\": \"{{1.channelId}}\", \"slack_thread_ts\": \"{{1.ts}}\"}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0,
+          "name": "Trigger GitHub Actions"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "slack:ActionCreateMessage",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "channelId": "{{1.channelId}}",
+        "text": "Got it! Decoding your request — takes ~4 mins, I'll post the deck here when ready 🚀",
+        "thread_ts": "{{1.ts}}",
+        "as_user": false
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0,
+          "name": "Slack — Working on it"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    }
+  }
+}
