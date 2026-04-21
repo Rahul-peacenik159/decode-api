@@ -197,7 +197,7 @@ def main():
     run([python(repo2), "build_pptx.py",
          "--domain",    domain,
          "--run-id",    run_id,
-         "--local-path", str(repo1)],
+         "--local-path", str(repo1.resolve())],
         cwd=repo2)
 
     # ── STEP 4: Social decoder (Repo 3) ─────────────────────────────────────
@@ -228,7 +228,7 @@ def main():
     cmd = [python(repo2), "build_pptx.py",
            "--domain",    domain,
            "--run-id",    run_id,
-           "--local-path", str(repo1)]
+           "--local-path", str(repo1.resolve())]
 
     if social_run_dir and social_run_dir.exists():
         cmd += ["--social-path", str(social_run_dir)]
