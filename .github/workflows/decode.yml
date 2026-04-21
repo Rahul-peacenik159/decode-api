@@ -15,6 +15,9 @@ on:
   repository_dispatch:
     types: [decode]
 
+permissions:
+  contents: write
+
 jobs:
   decode:
     runs-on: ubuntu-latest
