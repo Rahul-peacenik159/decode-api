@@ -170,7 +170,7 @@ def main():
                 "import sys; sys.path.insert(0, '.'); "
                 "from tools import ppt_content; from pathlib import Path; "
                 f"ppt_content.generate("
-                f"  report_path='{report_path}',"
+                f"  report_path='{report_path.resolve()}',"
                 f"  domain='{domain}',"
                 f"  run_id='{run_id}',"
                 f"  decodes_dir=Path('output/decodes/{domain}'),"
