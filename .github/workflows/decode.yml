@@ -68,10 +68,10 @@ jobs:
           echo "path=$FILE"             >> $GITHUB_OUTPUT
           echo "name=$(basename $FILE)" >> $GITHUB_OUTPUT
 
-      - name: Upload PPTX to 0x0.st (temp link)
+      - name: Upload PPTX to catbox.moe (temp link)
         id: upload
         run: |
-          LINK=$(curl -s -F "file=@${{ steps.pptx.outputs.path }}" https://0x0.st)
+          LINK=$(curl -s -F "reqtype=fileupload" -F "fileToUpload=@${{ steps.pptx.outputs.path }}" https://catbox.moe/user/api.php)
           echo "Response: $LINK"
           echo "link=$LINK" >> $GITHUB_OUTPUT
 
