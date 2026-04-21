@@ -68,14 +68,13 @@ jobs:
           echo "path=$FILE"             >> $GITHUB_OUTPUT
           echo "name=$(basename $FILE)" >> $GITHUB_OUTPUT
 
-      - name: Upload PPTX to file.io (temp link)
+      - name: Upload PPTX to transfer.sh (temp link)
         id: upload
         run: |
-          RESPONSE=$(curl -s -F "file=@${{ steps.pptx.outputs.path }}" \
-                          -F "expires=1d" \
-                          https://file.io)
-          echo "Response: $RESPONSE"
-          LINK=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('link',''))")
+          FILENAME="${{ steps.pptx.outputs.name }}"
+          LINK=$(curl -s --upload-file "${{ steps.pptx.outputs.path }}" \
+                      "https://transfer.sh/${FILENAME}")
+          echo "Response: $LINK"
           echo "link=$LINK" >> $GITHUB_OUTPUT
 
       - name: Send result to Make.com webhook
