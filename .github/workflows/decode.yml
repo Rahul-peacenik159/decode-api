@@ -68,12 +68,10 @@ jobs:
           echo "path=$FILE"             >> $GITHUB_OUTPUT
           echo "name=$(basename $FILE)" >> $GITHUB_OUTPUT
 
-      - name: Upload PPTX to transfer.sh (temp link)
+      - name: Upload PPTX to 0x0.st (temp link)
         id: upload
         run: |
-          FILENAME="${{ steps.pptx.outputs.name }}"
-          LINK=$(curl -s --upload-file "${{ steps.pptx.outputs.path }}" \
-                      "https://transfer.sh/${FILENAME}")
+          LINK=$(curl -s -F "file=@${{ steps.pptx.outputs.path }}" https://0x0.st)
           echo "Response: $LINK"
           echo "link=$LINK" >> $GITHUB_OUTPUT
 
