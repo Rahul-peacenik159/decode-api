@@ -68,11 +68,20 @@ jobs:
           echo "path=$FILE"             >> $GITHUB_OUTPUT
           echo "name=$(basename $FILE)" >> $GITHUB_OUTPUT
 
-      - name: Upload PPTX to catbox.moe (temp link)
+      - name: Upload PPTX as GitHub Release asset
         id: upload
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          LINK=$(curl -s -F "reqtype=fileupload" -F "fileToUpload=@${{ steps.pptx.outputs.path }}" https://catbox.moe/user/api.php)
-          echo "Response: $LINK"
+          TAG="decode-output"
+          gh release delete "$TAG" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Latest Decode Output" \
+            --notes "Auto-updated by pipeline"
+          gh release upload "$TAG" "${{ steps.pptx.outputs.path }}" \
+            --repo "${{ github.repository }}"
+          LINK="https://github.com/${{ github.repository }}/releases/download/${TAG}/${{ steps.pptx.outputs.name }}"
           echo "link=$LINK" >> $GITHUB_OUTPUT
 
       - name: Send result to Make.com webhook
