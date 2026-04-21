@@ -231,7 +231,7 @@ def main():
            "--local-path", str(repo1.resolve())]
 
     if social_run_dir and social_run_dir.exists():
-        cmd += ["--social-path", str(social_run_dir)]
+        cmd += ["--social-path", str(social_run_dir.resolve())]
         print(f"  Including social slides from: {social_run_dir}")
     else:
         print("  No social data — building website-only PPTX")
